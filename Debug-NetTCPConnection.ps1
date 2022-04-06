@@ -70,7 +70,6 @@ function Debug-NetTCPConnection {
 
             # check each dns client server address defined to ensure that each one is able to resolve the endpoint name
             foreach ($dnsClientAddress in $dnsClientAddresses) {
-                "[{0}] Attempting to resolve {0}" -f $dnsClientAddress, $Endpoint | Write-Host -ForegroundColor:Cyan
                 $ipAddress = (Resolve-DnsName -Name $Endpoint -Type A -DnsOnly -Server $dnsClientAddress -ErrorAction SilentlyContinue).Ip4Address
 
                 if ($null -eq $ipAddress) {
@@ -96,7 +95,6 @@ function Debug-NetTCPConnection {
         $ipArrayList = $ipArrayList | Sort-Object -Unique
         "Attempting to validate TCP connectivity to {0}" -f ($ipArrayList -join ', ') | Write-Host -ForegroundColor:Cyan
         foreach ($ip in $ipArrayList) {
-            "[{0}:{1}] Testing TCP connectivity" -f $ip, $Port | Write-Host -ForegroundColor:Cyan
             $result = Test-NetConnection -ComputerName $ip -Port $Port -InformationLevel Detailed
             if ($result.TcpTestSucceeded -ne $true) {
                 "[{0}:{1}] Failed to establish TCP connection. Investigate further to validate appropriate firewall policies TCP traffic to specified endpoint and port." -f $ip, $Port | Write-Warning
