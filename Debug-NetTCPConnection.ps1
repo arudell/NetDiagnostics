@@ -1,19 +1,3 @@
-function Confirm-IpAddress {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true)]
-        $Value
-    )
-
-    $isIpAddress = ($Value -as [IPAddress]) -as [Bool]
-    if ($isIpAddress) {
-        return $true
-    }
-    else {
-        return $false
-    }
-}
-
 function Debug-NetTCPConnection {
     [CmdletBinding()]
     param (
@@ -31,6 +15,22 @@ function Debug-NetTCPConnection {
         [System.Management.Automation.Credential()]
         $Credential = [System.Management.Automation.PSCredential]::Empty
     )
+
+    function Confirm-IpAddress {
+        [CmdletBinding()]
+        param (
+            [Parameter(Mandatory = $true)]
+            $Value
+        )
+
+        $isIpAddress = ($Value -as [IPAddress]) -as [Bool]
+        if ($isIpAddress) {
+            return $true
+        }
+        else {
+            return $false
+        }
+    }
 
     try {
         $ipArrayList = @()
