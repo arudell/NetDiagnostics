@@ -70,7 +70,7 @@ function Debug-NetTCPConnection {
             $Global:ProgressPreference = 'SilentlyContinue'
             $ipArrayList = $ipArrayList | Sort-Object -Unique
             "Attempting to validate TCP connectivity to {0}" -f ($ipArrayList -join ', ') | Write-Host -ForegroundColor:Cyan
-            foreach ($ip in $ipArrayList[0]) {
+            foreach ($ip in $ipArrayList) {
                 "Testing TCP connectivity to {0}:{1}" -f $ip, $Port | Write-Host -ForegroundColor:Cyan
                 $result = Test-NetConnection -ComputerName $ip -Port $Port -InformationLevel Detailed
                 if ($result.TcpTestSucceeded -ne $true) {
