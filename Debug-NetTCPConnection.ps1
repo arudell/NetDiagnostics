@@ -70,6 +70,7 @@ function Debug-NetTCPConnection {
 
             # check each dns client server address defined to ensure that each one is able to resolve the endpoint name
             foreach ($dnsClientAddress in $dnsClientAddresses) {
+                "[{0}] Attempting to resolve {0}" -f $dnsClientAddress, $Endpoint  | Write-Verbose
                 $ipAddress = (Resolve-DnsName -Name $Endpoint -Type A -DnsOnly -Server $dnsClientAddress -ErrorAction SilentlyContinue).Ip4Address
 
                 if ($null -eq $ipAddress) {
@@ -93,8 +94,9 @@ function Debug-NetTCPConnection {
         # this could be OS related firewalls or network firewall appliances
         $Global:ProgressPreference = 'SilentlyContinue'
         $ipArrayList = $ipArrayList | Sort-Object -Unique
-        "Attempting to validate TCP connectivity to {0}" -f ($ipArrayList -join ', ') | Write-Host -ForegroundColor:Cyan
+        "Attempting to validate TCP connectivity to {0}" -f ($ipArrayList -join ', ') | Write-Verbose
         foreach ($ip in $ipArrayList) {
+            "[{0}:{1}] Testing TCP connectivity" -f $ip, $Port | Write-Verbose
             $result = Test-NetConnection -ComputerName $ip -Port $Port -InformationLevel Detailed
             if ($result.TcpTestSucceeded -ne $true) {
                 "[{0}:{1}] Failed to establish TCP connection. Investigate further to validate appropriate firewall policies TCP traffic to specified endpoint and port." -f $ip, $Port | Write-Warning
@@ -111,11 +113,11 @@ function Debug-NetTCPConnection {
             $tlsVersions = @('Tls','Tls11','Tls12','Tls13')
 
             foreach ($version in $tlsVersions) {
-                "[{0}] Configuring Windows PowerShell to use {0}" -f $version | Write-Host -ForegroundColor:Cyan
+                "[{0}] Configuring Windows PowerShell to use {0}" -f $version | Write-Verbose
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::$version
                 [System.String]$uri = "https://{0}:{1}" -f $Endpoint, $Port
 
-                "[{0}] Creating web request to {1}" -f $version, $uri | Write-Host -ForegroundColor:Cyan
+                "[{0}] Creating web request to {1}" -f $version, $uri | Write-Verbose
                 try {
                     if ($Credential -ne [System.Management.Automation.PSCredential]::Empty) {
                         $webRequest = Invoke-WebRequest -Uri $uri -UseBasicParsing -Credential $Credential -TimeoutSec 20 -ErrorAction Stop
