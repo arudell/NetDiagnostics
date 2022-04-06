@@ -1,4 +1,25 @@
 function Debug-NetTCPConnection {
+    <#
+        .SYNOPSIS
+            Diagnostic script used to test core network connectivity to remote endpoint by validating DNS, TCP and TLS.
+        .PARAMETER Endpoint
+            The remote endpoint that you are attempting to create connection to.
+        .PARAMETER Port
+            The port number for the remote endpoint.
+        .PARAMETER TlsEnabled
+            Specify whether to test and validate TLS connectivity
+        .PARAMETER Credential
+            Specify the remote credentials to access the remote endpoint. Used in conjuction with TlsEnabled:$true
+        .EXAMPLE
+            PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443 -TlsEnabled:$true
+        .EXAMPLE
+            PS> Debug-NetTCPConnection -Endpoint 20.190.155.16:443 -Port 443 -TlsEnabled:$true
+        .EXAMPLE
+            PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443 -TlsEnabled:$true -Credential (Get-Credential)
+        .EXAMPLE
+            PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443 -TlsEnabled:$false
+    #>
+
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
