@@ -125,7 +125,7 @@ function New-PSRemoteSession {
 #### end functions ####
 
 # enable network traces within the tenant virtual machines and then monitor for failure
-Enable-TenantTracing -IPAddress $appVMIPAddress  -Credential $appVMCred -FilePath $tenantTraceFilePath -MaxSize 256
+Enable-TenantTracing -IPAddress $appVMIPAddress  -Credential $appVMCred -FilePath $tenantTraceFilePath
 Enable-TenantTracing -IPAddress $sqlVMIPAddress  -Credential $sqlVMCred -FilePath $tenantTraceFilePath
 $result = Invoke-Command -ComputerName $appVMIPAddress -Credential $appVMCred -ScriptBlock ${function:Watch-ForFailure} -ArgumentList ($LogName,$Message)
 
