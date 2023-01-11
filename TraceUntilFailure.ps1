@@ -3,10 +3,10 @@
 [string]$LogName = '{logname}'
 [string]$errorMessage = '{insert error message}'
 
-[String]$appVMIPAddress  = 'xxx.xx.xx.xx'
+[string]$appVMIPAddress  = 'xxx.xx.xx.xx'
 $appVMCred = Get-Credential -Message "Provide credentials for $appVMIPAddress"
 
-[String]$sqlVMIPAddress  = 'xxx.xx.xx.xx'
+[string]$sqlVMIPAddress  = 'xxx.xx.xx.xx'
 $sqlVMCred = Get-Credential -Message "Provide credentials for $sqlVMIPAddress"
 
 #### start functions ####
