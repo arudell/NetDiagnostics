@@ -14,7 +14,7 @@ Param (
     [int]$Count = 100000,
     
     [Parameter()]
-    [int]$Interval=5,
+    [int]$Interval = 5,
     
     [Parameter()]
     [string]$LogPath = "$env:USERPROFILE\Documents\PingResults\PingLoop.csv"
