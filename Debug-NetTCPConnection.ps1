@@ -7,7 +7,7 @@ function Debug-NetTCPConnection {
         .PARAMETER Port
             The port number for the remote endpoint.
         .PARAMETER Credential
-            Specify the remote credentials to access the remote endpoint. Used in conjuction with TlsEnabled:$true
+            Specify the remote credentials to access the remote endpoint.
         .EXAMPLE
             PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443 -Credential (Get-Credential)
         .EXAMPLE
