@@ -74,7 +74,7 @@ function Debug-NetTCPConnection {
             # check each dns client server address defined to ensure that each one is able to resolve the endpoint name
             foreach ($dnsClientAddress in $dnsClientAddresses) {
                 "Attempting to resolve $hostName using DNS server $dnsClientAddress"  | Write-Verbose
-                $ipAddress = (Resolve-DnsName -Name $hostName -Type A -DnsOnly -Server $dnsClientAddress -ErrorAction SilentlyContinue).Ip4Address
+                $ipAddress = (Resolve-DnsName -Name $hostName -Type A -DnsOnly -Server $dnsClientAddress -ErrorAction Ignore).Ip4Address
 
                 if ($null -eq $ipAddress) {
                     Write-Host "✗ IP $($ipAddress) - DNS resolution failed using DNS server $dnsClientAddress" -ForegroundColor Red
@@ -96,19 +96,13 @@ function Debug-NetTCPConnection {
         # this could be OS related firewalls or network firewall appliances
         $ipArrayList = $ipArrayList | Sort-Object -Unique
         foreach ($ip in $ipArrayList) {
-            "Testing TCP connectivity to IP $ip on port $Port" | Write-Verbose
-            $result = Test-NetConnection -ComputerName $ip -Port $Port -InformationLevel Detailed
-            if ($result.TcpTestSucceeded -ne $true) {
-                Write-Host "✗ IP $ip - TCP connection failed" -ForegroundColor Red
-            }
-            else {
-                Write-Host "✓ IP $($ip):$($Port) - TCP connection successful" -ForegroundColor Green
+            try {
+                "Testing TCP connectivity to IP $ip on port $Port" | Write-Verbose
+                $tcpClient = New-Object System.Net.Sockets.TcpClient($ip, $Port)
 
-                # if we specified the endpoint, then lets try to test TLS connection. this first requires that we had been able to establish TCP connectivity to the endpoint
-                # this will ensure that the two endpoints can negotiate and mutally agree on the TLS certificate, ciphers and version that are being used
-                if ($TlsEnabled) {
+                Write-Host "✓ IP $($ip):$($Port) - TCP connection successful" -ForegroundColor Green
+                if ($tcpClient.Connected -and $TlsEnabled) {
                     try {
-                        $tcpClient = New-Object System.Net.Sockets.TcpClient($ip, $Port)
                         $sslStream = New-Object System.Net.Security.SslStream($tcpClient.GetStream(), $false)
                         $sslStream.AuthenticateAsClient($hostname)
 
@@ -124,6 +118,12 @@ function Debug-NetTCPConnection {
                         if ($tcpClient) { $tcpClient.Close() }
                     }
                 }
+            }
+            catch {
+                Write-Host "✗ IP $($ip):$($Port) - TCP connection failed: $($_.Exception.Message)" -ForegroundColor Red
+            }
+            finally {
+                if ($tcpClient) { $tcpClient.Close() }
             }
         }
     }
