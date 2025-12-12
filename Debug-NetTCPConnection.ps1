@@ -6,30 +6,21 @@ function Debug-NetTCPConnection {
             The remote endpoint that you are attempting to create connection to.
         .PARAMETER Port
             The port number for the remote endpoint.
-        .PARAMETER TlsEnabled
-            Specify whether to test and validate TLS connectivity
         .PARAMETER Credential
             Specify the remote credentials to access the remote endpoint. Used in conjuction with TlsEnabled:$true
         .EXAMPLE
-            PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443 -TlsEnabled:$true
+            PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443 -Credential (Get-Credential)
         .EXAMPLE
-            PS> Debug-NetTCPConnection -Endpoint 20.190.155.16:443 -Port 443 -TlsEnabled:$true
-        .EXAMPLE
-            PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443 -TlsEnabled:$true -Credential (Get-Credential)
-        .EXAMPLE
-            PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443 -TlsEnabled:$false
+            PS> Debug-NetTCPConnection -Endpoint login.microsoftonline.com -Port 443
     #>
 
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
-        [System.String]$Endpoint,
+        [system.string]$Endpoint,
 
         [Parameter(Mandatory = $true)]
         [System.Int32]$Port,
-
-        [Parameter(Mandatory = $true)]
-        [System.Boolean]$TlsEnabled,
 
         [Parameter(Mandatory = $false)]
         [System.Management.Automation.PSCredential]
@@ -53,92 +44,85 @@ function Debug-NetTCPConnection {
         }
     }
 
+    $ipArrayList = @()
     try {
-        $ipArrayList = @()
+        # check to see if we dealing with a URI string that was passed as endpoint
+        if ($Endpoint.StartsWith("http")){
+            [uri]$Endpoint = $Endpoint
+            $TlsEnabled = $true
 
-        if (Confirm-IpAddress -Value $Endpoint) {
-            $ipArrayList += $Endpoint
+            $hostName = $Endpoint.Host
+            if ($null -ieq $Port) {
+                $Port = $Endpoint.Port
+            }
         }
         else {
-            # get a list of dns client server addresses that are programmed for the network interfaces as we will want to test each one to ensure name resolution
-            # if no server addresses defined, then throw warning and terminate
+            $hostName = $Endpoint
+        }
+
+        # check to see if we dealing with an IP address, otherwise will need to get a list of IP address(es) from DNS to test
+        if (Confirm-IpAddress -Value $hostName) {
+            "Endpoint is an IP address: $hostName" | Write-Verbose
+            $ipArrayList += $hostName
+        }
+        else {
             $dnsClientAddresses = (Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses | Sort-Object -Unique
             if ($null -eq $dnsClientAddresses) {
-                "No DNS client server addresses defined on network interfaces. Investigate to determine why interfaces are not getting assigned a DNS server." | Write-Warning
-                return
+                throw "No DNS client server addresses defined on network interfaces. Investigate to determine why interfaces are not getting assigned a DNS server."
             }
 
             # check each dns client server address defined to ensure that each one is able to resolve the endpoint name
             foreach ($dnsClientAddress in $dnsClientAddresses) {
-                "[{0}] Attempting to resolve {0}" -f $dnsClientAddress, $Endpoint  | Write-Verbose
-                $ipAddress = (Resolve-DnsName -Name $Endpoint -Type A -DnsOnly -Server $dnsClientAddress -ErrorAction SilentlyContinue).Ip4Address
+                "Attempting to resolve $hostName using DNS server $dnsClientAddress"  | Write-Verbose
+                $ipAddress = (Resolve-DnsName -Name $hostName -Type A -DnsOnly -Server $dnsClientAddress -ErrorAction SilentlyContinue).Ip4Address
 
                 if ($null -eq $ipAddress) {
-                    "[{0}] Unable to return DNS results for {0}." -f $dnsClientAddress, $Endpoint | Write-Warning
+                    Write-Host "✗ IP $($ipAddress) - DNS resolution failed using DNS server $dnsClientAddress" -ForegroundColor Red
                 }
                 else {
-                    "[{0}] Successfully resolved {1} to {2}" -f $dnsClientAddress, $Endpoint, ($ipAddress -join ', ') | Write-Host -ForegroundColor:Green
+                    Write-Host "✓ IP $($ipAddress) - DNS resolution successful for $hostName" -ForegroundColor Green
                     $ipArrayList += $ipAddress
                 }
             }
 
             # if we returned no IP addresses from DNS, then advise user to investigate into DNS or try using an IP address and terminate
             if ($null -eq $ipArrayList) {
-                "No IP addresses identified. Investigate further into DNS or run Debug-NetTCPConnection using IP address." | Write-Warning
-                return
+                throw "No IP addresses identified. Investigate further into DNS or run Debug-NetTCPConnection using IP address."
             }
         }
 
         # now that we have the IP addresses to test against, lets first attempt to create a TCP connection to the remote endpoint
         # if this fails, then firewall policies may need to be investigated to see if there are any IP or TCP rules that would block the connection
         # this could be OS related firewalls or network firewall appliances
-        $Global:ProgressPreference = 'SilentlyContinue'
         $ipArrayList = $ipArrayList | Sort-Object -Unique
-        "Attempting to validate TCP connectivity to {0}" -f ($ipArrayList -join ', ') | Write-Verbose
         foreach ($ip in $ipArrayList) {
-            "[{0}:{1}] Testing TCP connectivity" -f $ip, $Port | Write-Verbose
+            "Testing TCP connectivity to IP $ip on port $Port" | Write-Verbose
             $result = Test-NetConnection -ComputerName $ip -Port $Port -InformationLevel Detailed
             if ($result.TcpTestSucceeded -ne $true) {
-                "[{0}:{1}] Failed to establish TCP connection. Investigate further to validate appropriate firewall policies TCP traffic to specified endpoint and port." -f $ip, $Port | Write-Warning
+                Write-Host "✗ IP $ip - TCP connection failed" -ForegroundColor Red
             }
             else {
-                "[{0}:{1}] Successfully established TCP connection." -f $ip, $Port | Write-Host -ForegroundColor:Green
-            }
-        }
-        $Global:ProgressPreference = 'Continue'
+                Write-Host "✓ IP $($ip):$($Port) - TCP connection successful" -ForegroundColor Green
 
-        # if we specified the endpoint, then lets try to test TLS connection. this first requires that we had been able to establish TCP connectivity to the endpoint
-        # this will ensure that the two endpoints can negotiate and mutally agree on the TLS certificate, ciphers and version that are being used
-        if ((-NOT (Confirm-IpAddress -Value $Endpoint)) -and $TlsEnabled) {
-            $tlsVersions = @('Tls','Tls11','Tls12','Tls13')
+                # if we specified the endpoint, then lets try to test TLS connection. this first requires that we had been able to establish TCP connectivity to the endpoint
+                # this will ensure that the two endpoints can negotiate and mutally agree on the TLS certificate, ciphers and version that are being used
+                if ($TlsEnabled) {
+                    try {
+                        $tcpClient = New-Object System.Net.Sockets.TcpClient($ip, $Port)
+                        $sslStream = New-Object System.Net.Security.SslStream($tcpClient.GetStream(), $false)
+                        $sslStream.AuthenticateAsClient($hostname)
 
-            foreach ($version in $tlsVersions) {
-                "[{0}] Configuring Windows PowerShell to use {0}" -f $version | Write-Verbose
-                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::$version
-                [System.String]$uri = "https://{0}:{1}" -f $Endpoint, $Port
-
-                "[{0}] Creating web request to {1}" -f $version, $uri | Write-Verbose
-                try {
-                    if ($Credential -ne [System.Management.Automation.PSCredential]::Empty) {
-                        $webRequest = Invoke-WebRequest -Uri $uri -UseBasicParsing -Credential $Credential -TimeoutSec 20 -ErrorAction Stop
+                        Write-Host "✓ IP $ip - TLS handshake successful" -ForegroundColor Green
+                        Write-Host "`t`tCertificate: $($sslStream.RemoteCertificate.Subject)"
+                        Write-Host "`t`tIssuer: $($sslStream.RemoteCertificate.Issuer)"
                     }
-                    else {
-                        $webRequest = Invoke-WebRequest -Uri $uri -UseBasicParsing -UseDefaultCredentials -TimeoutSec 20 -ErrorAction Stop
+                    catch {
+                        Write-Host "✗ IP $ip - TLS failed: $($_.Exception.Message)" -ForegroundColor Red
                     }
-
-                    if ($webRequest) {
-                        "[{0}] Returned a status {1} from {2}" -f $version, $webRequest.StatusDescription, $uri | Write-Host -ForegroundColor:Green
+                    finally {
+                        if ($sslStream) { $sslStream.Close() }
+                        if ($tcpClient) { $tcpClient.Close() }
                     }
-                }
-                catch [System.Exception] {
-                    switch -Wildcard ($_.Exception) {
-                        "*The underlying connection was closed*" {
-                            "[{0}] The underlying connection was closed. {0} does not appear to be supported." -f $version | Write-Warning
-                        }
-                    }
-                }
-                catch {
-                    throw $_
                 }
             }
         }
